@@ -169,6 +169,17 @@ def get_history_ids(sid):
         pass
     #return dict((h['uuid'], h['history_id']) for h in data['history'])
 
+def get_history_ids_orig(sid):
+    """
+    Get history ids
+
+    Create a dictionary of scan uuids and history ids so we can lookup the
+    history id by uuid.
+    """
+    data = connect('GET', '/scans/{0}'.format(sid))
+
+    return dict((h['uuid'], h['history_id']) for h in data['history'])
+
 
 def get_scan_history(sid, hid):
     """
@@ -193,6 +204,16 @@ def get_status(sid):
         if str(key) == str(sid):
             create_menu(value, temp_status_dict[key], 'Null')
 
+def status(sid, hid):
+    """
+    Check the status of a scan run
+
+    Get the historical information for the particular scan and hid. Return
+    the status if available. If not return unknown.
+    """ 
+
+    d = get_scan_history(sid, hid)
+    return d['status']
 
 def launch(sid):
     # Launch the scan specified by the sid.
@@ -222,6 +243,66 @@ def logout():
     print('Logged Out')
     exit()
 
+def download(sid, fid):
+    """
+    Download the scan results
+
+    Download the scan results stored in the export file specified by fid for
+    the scan specified by sid.
+    """
+
+    data = connect('GET', '/scans/{0}/export/{1}/download'.format(sid, fid))
+    filename = 'nessus_{0}_{1}.csv'.format(sid, fid) # it was .nessus format
+
+    print('Saving scan results to {0}.'.format(filename))
+    with open(filename, 'w') as f:
+        f.write(data)
+
+
+def export_status(sid, fid):
+    """
+    Check export status
+
+    Check to see if the export is ready for download.
+    """
+
+    data = connect('GET', '/scans/{0}/export/{1}/status'.format(sid, fid))
+
+    return data['status'] == 'ready'
+
+def export(sid, hid):
+    """
+    Make an export request
+
+    Request an export of the scan results for the specified scan and
+    historical run. In this case the format is hard coded as nessus but the
+    format can be any one of nessus, html, pdf, csv, or db. Once the request
+    is made, we have to wait for the export to be ready.
+    """
+
+    data = {'history_id': hid,
+            'format': 'csv'} # nessus
+
+    data = connect('POST', '/scans/{0}/export'.format(sid), data=data)
+
+    fid = data['file']
+
+    while export_status(sid, fid) is False:
+        time.sleep(5)
+
+    return fid
+
+
+def startDownload(scan_uuid, scan_id):
+    print('START DOWNLOAD {0}, {1}'.format(scan_uuid, scan_id))
+    history_ids = get_history_ids_orig(scan_id)
+    history_id = history_ids[scan_uuid]
+    while status(scan_id, history_id) != 'completed':
+        time.sleep(5)
+
+    print('Exporting the completed scan.')
+    file_id = export(scan_id, history_id)
+    download(scan_id, file_id)
 
 
 if __name__ == '__main__':
@@ -234,7 +315,7 @@ if __name__ == '__main__':
     print('Logging in...')
     try:token = login(username, password)
     except: print('Unable to login :('); exit()
-    print('Logged in!\n\n')
+    print('Logged in! token:{0}\n\n'.format(token))
 
 
 ###### Display all policies  #######
@@ -274,7 +355,8 @@ if __name__ == '__main__':
             if str(key) == str(start_id):
                 if temp_status_dict[key].lower() in ['stopped', 'completed' , 'aborted', 'canceled', 'on demand', 'empty']:
                     print('Launching Scan %s') %key
-                    launch(start_id)
+                    scan_uuid = launch(start_id)
+                    startDownload(scan_uuid, start_id)
                 elif temp_status_dict[key].lower() in ['running']:
                     print('Scan already running!')
                     logout()
