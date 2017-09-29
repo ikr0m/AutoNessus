@@ -316,7 +316,7 @@ if __name__ == '__main__':
     print('Logging in...')
     try:token = login(username, password)
     except: print('Unable to login :('); exit()
-    print('Logged in! token:{0}\n\n'.format(token))
+    print('Logged in!')
 
 
 ###### Display all policies  #######
