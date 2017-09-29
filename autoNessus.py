@@ -252,7 +252,7 @@ def download(sid, fid):
     """
 
     data = connect('GET', '/scans/{0}/export/{1}/download'.format(sid, fid))
-    filename = 'nessus_{0}_{1}.csv'.format(sid, fid) # it was .nessus format
+    filename = 'nessus_{0}_{1}.pdf'.format(sid, fid)
 
     print('Saving scan results to {0}.'.format(filename))
     with open(filename, 'w') as f:
@@ -281,7 +281,8 @@ def export(sid, hid):
     """
 
     data = {'history_id': hid,
-            'format': 'csv'} # nessus
+            'format': 'pdf',
+            'chapters': 'vuln_hosts_summary'}
 
     data = connect('POST', '/scans/{0}/export'.format(sid), data=data)
 
@@ -293,7 +294,7 @@ def export(sid, hid):
     return fid
 
 
-def startDownload(scan_uuid, scan_id):
+def start_download(scan_uuid, scan_id):
     print('START DOWNLOAD {0}, {1}'.format(scan_uuid, scan_id))
     history_ids = get_history_ids_orig(scan_id)
     history_id = history_ids[scan_uuid]
@@ -356,7 +357,7 @@ if __name__ == '__main__':
                 if temp_status_dict[key].lower() in ['stopped', 'completed' , 'aborted', 'canceled', 'on demand', 'empty']:
                     print('Launching Scan %s') %key
                     scan_uuid = launch(start_id)
-                    startDownload(scan_uuid, start_id)
+                    start_download(scan_uuid, start_id)
                 elif temp_status_dict[key].lower() in ['running']:
                     print('Scan already running!')
                     logout()
